@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WK Fretes – Sistema</title>
+<style>
+:root{--bg:#fff;--card:#f4f4f5;--tx:#18181b;--mu:#71717a;--ac:#e8604c;--ok:#15803d;--bad:#b91c1c;--bd:#e4e4e7;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b0b0c;--card:#18181b;--tx:#f4f4f5;--mu:#a1a1aa;--ac:#f0735f;--ok:#4ade80;--bad:#f87171;--bd:#27272a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0b0b0c;--card:#18181b;--tx:#f4f4f5;--mu:#a1a1aa;--ac:#f0735f;--ok:#4ade80;--bad:#f87171;--bd:#27272a;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;max-width:720px;margin:auto;padding:12px}
+header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+h1{font-size:18px;margin:0}h1 span{color:var(--ac)}h3{margin:18px 0 8px;font-size:14px;color:var(--mu);text-transform:uppercase;letter-spacing:.04em}
+select,input,button,textarea{font:inherit;color:inherit;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px;width:100%}
+header select{width:auto}
+#tb{display:flex;gap:4px;margin:12px 0}#tb button{padding:9px 2px;font-size:12px}#tb .on{background:var(--ac);border-color:var(--ac);color:#fff}
+button{cursor:pointer}.pri{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:8px}.k{background:var(--card);border-radius:12px;padding:12px}.k small{color:var(--mu);display:block}.k b{font-size:18px}
+.ok{color:var(--ok)}.bad{color:var(--bad)}
+.ch{display:flex;align-items:flex-end;gap:3px;height:120px;overflow-x:auto;background:var(--card);border-radius:12px;padding:8px}
+.b{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;flex:1;min-width:16px;height:100%}
+.b i{display:block;width:70%;background:var(--ac);border-radius:3px 3px 0 0}.b span{font-size:9px;color:var(--mu)}
+.row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 8px;padding:9px 2px;border-bottom:1px solid var(--bd)}small{color:var(--mu)}summary{cursor:pointer}details[open]>summary{border-bottom:0}details>div{padding-left:10px}
+.card{background:var(--card);border-radius:12px;padding:12px;display:grid;gap:10px}.card input,.card select{background:var(--bg)}
+label{display:grid;gap:4px;font-size:13px;color:var(--mu)}
+.x{width:auto;padding:2px 9px;background:none;border:0;color:var(--mu);font-size:18px}
+textarea{height:130px;margin-top:10px}.sc{overflow-x:auto}
+#m{min-height:20px;color:var(--ac);font-size:13px;margin-top:6px}
+</style></head><body>
+<header><h1>WK <span>FRETES</span> · Sistema</h1><select id="ms" onchange="mes=this.value;draw()"></select></header>
+<div id="tb"></div><div id="m"></div><div id="v">Carregando…</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const R=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}).replace(/\u00a0/g,' ');
+const E=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const FIX=['DAS','Manutenção','Estacionamento','PF','Terreno','Internet','Luz','Casa'];
+const CATS=['Faturamento','Freelancer','Alimentação','Gasolina','Insumos',...FIX];
+let M={},mes='',tab='painel',cli='',col=null,dl=null,FL=null,first=true;
+const mn=k=>new Date(k+'-15T12:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+const fd=d=>d.slice(8)+'/'+d.slice(5,7);
+const rows=()=>M[mes]||[];
+function msg(t){$('#m').textContent=t;clearTimeout(msg.t);msg.t=setTimeout(()=>$('#m').textContent='',4500)}
+async function save(k){if(!col){try{localStorage.setItem('wk_meses',JSON.stringify(M))}catch(e){msg('Não consegui salvar neste navegador.')}return}try{await col.doc(k).set({rows:M[k]})}catch(e){msg('Erro ao salvar. Tente de novo.')}}
+async function file(name,data){if(!dl){const u=URL.createObjectURL(data instanceof Blob?data:new Blob([data])),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);return}try{await dl.save({filename:name,data})}catch(e){msg('Download cancelado.')}}
+function calc(r){let f=0,op=0,fx=0;r.forEach(x=>{f+=x.e||0;if(FIX.includes(x.c))fx+=x.s||0;else op+=x.s||0});return{f,op,fx,liq:f-op-fx}}
+
+function painel(){
+ const r=rows(),c=calc(r),fr=r.filter(x=>x.c==='Faturamento'),n=fr.length,di={},cl={};
+ fr.forEach(x=>{di[x.d]=(di[x.d]||0)+x.e;(cl[x.n]=cl[x.n]||[0,0]);cl[x.n][0]++;cl[x.n][1]+=x.e});
+ const ds=Object.keys(di).sort(),mx=Math.max(1,...ds.map(d=>di[d]));
+ const top=Object.entries(cl).sort((a,b)=>b[1][1]-a[1][1]).slice(0,8);
+ const k=(t,v,s='')=>`<div class="k"><small>${t}</small><b class="${s}">${v}</b></div>`;
+ if(!r.length)return '<p>Nenhum dado ainda. Vá em <b>Planilha</b> e importe seu Excel, ou use <b>Lançar</b>.</p>';
+ return `<div class="g">${k('Faturamento',R(c.f))}${k('Despesas',R(c.op))}${k('Fixos pagos',R(c.fx))}${k('Lucro líquido',R(c.liq),c.liq<0?'bad':'ok')}${k('Margem líquida',c.f?(c.liq/c.f*100).toFixed(1)+'%':'-')}${k('Ticket médio',n?R(c.f/n):'-')}</div>
+ <h3>Faturamento por dia</h3><div class="ch">${ds.map(d=>`<div class="b" title="${R(di[d])}"><i style="height:${Math.round(di[d]/mx*92)}px"></i><span>${d.slice(8)}</span></div>`).join('')}</div>
+ <h3>Melhores clientes</h3>${top.map(([a,[q,v]])=>`<div class="row"><span>${E(a)} <small>${q} entregas</small></span><b>${R(v)}</b></div>`).join('')}`}
+
+function dias(){
+ const g={};rows().forEach(x=>{(g[x.d]=g[x.d]||[]).push(x)});
+ const ds=Object.keys(g).sort().reverse();if(!ds.length)return '<p>Sem dados neste mês.</p>';
+ let tf=0,ts=0;
+ const h=ds.map(d=>{const l=g[d],f=l.reduce((a,x)=>a+(x.e||0),0),s=l.reduce((a,x)=>a+(x.s||0),0),q=l.filter(x=>x.c==='Faturamento').length;tf+=f;ts+=s;
+  return `<details><summary class="row"><span><b>${fd(d)}</b> <small>${q} entregas</small></span><span><b class="ok">${R(f)}</b> <small class="bad">−${R(s)}</small> <b>${R(f-s)}</b></span></summary>${l.map(x=>`<div class="row"><small>${E(x.n)} · ${E(x.c)}</small><span class="${x.e?'ok':'bad'}">${x.e?R(x.e):'−'+R(x.s)}</span></div>`).join('')}</details>`}).join('');
+ return `<small>Faturado · despesas · saldo do dia. Toque no dia para ver os lançamentos.</small>${h}<div class="row"><b>Total do mês</b><span><b class="ok">${R(tf)}</b> <small class="bad">−${R(ts)}</small> <b>${R(tf-ts)}</b></span></div>`}
+function gastos(){
+ const r=rows().filter(x=>x.s>0);if(!r.length)return '<p>Sem despesas neste mês.</p>';
+ const g={};r.forEach(x=>{g[x.c]=g[x.c]||[0,[]];g[x.c][0]+=x.s;g[x.c][1].push(x)});
+ const t=r.reduce((a,x)=>a+x.s,0);
+ const fz={};r.filter(x=>x.c==='Freelancer').forEach(x=>{(fz[x.n]=fz[x.n]||[]).push(x)});
+ const fl=Object.entries(fz).map(([n,l])=>[n,l,l.reduce((a,x)=>a+x.s,0)]).sort((a,b)=>b[2]-a[2]),ft=fl.reduce((a,x)=>a+x[2],0);
+ const fh=fl.map(([n,l,v])=>`<details><summary class="row"><span>${E(n)} <small>${l.length} entregas · média ${R(v/l.length)}</small></span><b>${R(v)}</b></summary>${l.sort((a,b)=>a.d<b.d?1:-1).map(x=>`<div class="row"><small>${fd(x.d)}</small><span>${R(x.s)}</span></div>`).join('')}</details>`).join('');
+ return `<div class="k"><small>Total de despesas</small><b class="bad">${R(t)}</b></div><h3>Freelancers · ${R(ft)}</h3>${fh||'<small>Nenhum freelancer neste mês.</small>'}<h3>Por categoria · toque para detalhar</h3>`+Object.entries(g).sort((a,b)=>b[1][0]-a[1][0]).map(([c,[v,l]])=>`<details><summary class="row"><span>${E(c)} <small>${(v/t*100).toFixed(0)}% · ${l.length} lanç.</small></span><b>${R(v)}</b></summary>${l.sort((a,b)=>a.d<b.d?1:-1).map(x=>`<div class="row"><small>${fd(x.d)} · ${E(x.n)}</small><span>${R(x.s)}</span></div>`).join('')}</details>`).join('')}
+function lancar(){
+ const h=new Date(),t=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');
+ const nm=[...new Set(Object.values(M).flat().filter(x=>x.c==='Faturamento').map(x=>x.n))].sort();
+ return `<div class="card"><label>Data<input id="fd" type="date" value="${t}"></label>
+ <label>Tipo<select id="ft" onchange="tp()"><option>Entrada</option><option>Saída</option></select></label>
+ <label>Cliente / descrição<input id="fn" list="nl" autocomplete="off"></label><datalist id="nl">${nm.map(n=>`<option value="${E(n)}">`).join('')}</datalist>
+ <label id="lc" style="display:none">Categoria<select id="fc">${CATS.slice(1).map(c=>`<option>${c}</option>`).join('')}</select></label>
+ <label>Valor (R$)<input id="fv" type="number" inputmode="decimal" step="0.01"></label>
+ <button class="pri" onclick="add()">Salvar lançamento</button></div><h3>Últimos lançamentos</h3><div id="lst"></div>`}
+function tp(){$('#lc').style.display=$('#ft').value==='Saída'?'':'none'}
+function lst(){const e=$('#lst');if(!e)return;e.innerHTML=rows().map((x,i)=>[x,i]).slice(-15).reverse().map(([x,i])=>`<div class="row"><span>${fd(x.d)} · ${E(x.n)} <small>${E(x.c)}</small></span><span><b class="${x.e?'ok':'bad'}">${x.e?'+'+R(x.e):'−'+R(x.s)}</b><button class="x" onclick="del(${i})">×</button></span></div>`).join('')||'<small>Nada neste mês.</small>'}
+function add(){
+ const d=$('#fd').value,n=$('#fn').value.trim(),v=+$('#fv').value,s=$('#ft').value==='Saída';
+ if(!d||!n||!(v>0))return msg('Preencha data, nome e valor.');
+ const x={d,n,c:s?$('#fc').value:'Faturamento',e:s?0:v,s:s?v:0},k=d.slice(0,7);
+ M[k]=[...(M[k]||[]),x];mes=k;save(k);$('#fn').value='';$('#fv').value='';msg('Lançamento salvo.');draw(true)}
+function del(i){M[mes].splice(i,1);save(mes);lst()}
+
+function fech(){
+ const fr=rows().filter(x=>x.c==='Faturamento'),nm=[...new Set(fr.map(x=>x.n))].sort(),sel=nm.includes(cli)?cli:'';
+ const l=fr.filter(x=>!sel||x.n===sel),tot=l.reduce((a,x)=>a+x.e,0);let ln;
+ if(sel)ln=l.map(x=>[fd(x.d),R(x.e)]);
+ else{const g={};l.forEach(x=>{g[x.n]=g[x.n]||[0,0];g[x.n][0]++;g[x.n][1]+=x.e});ln=Object.entries(g).sort((a,b)=>b[1][1]-a[1][1]).map(([a,[q,v]])=>[a+' ('+q+' entregas)',R(v)])}
+ FL={t:'Fechamento - '+mn(mes),c:sel||'Todos os clientes',ln,tot,q:l.length};
+ const tx=`*WK FRETES* - ${FL.t}\n${FL.c}\n\n`+ln.map(a=>a.join('  ')).join('\n')+`\n\n*Total: ${R(tot)}* (${l.length} entregas)\nObrigado pela parceria!`;
+ return `<label>Cliente<select onchange="cli=this.value;draw()"><option value="">Todos os clientes</option>${nm.map(n=>`<option ${n===sel?'selected':''}>${E(n)}</option>`).join('')}</select></label>
+ <h3>${E(FL.c)} · ${mn(mes)}</h3>${ln.map(a=>`<div class="row"><span>${E(a[0])}</span><b>${a[1]}</b></div>`).join('')||'<small>Sem entregas neste mês.</small>'}
+ <div class="row"><b>Total (${l.length} entregas)</b><b>${R(tot)}</b></div>
+ <button class="pri" style="margin-top:12px" onclick="pdf()">Baixar PDF</button>
+ <textarea readonly onfocus="this.select()">${E(tx)}</textarea><small>Toque no texto, copie e cole no WhatsApp.</small>`}
+function pdf(){
+ if(!window.jspdf||!FL)return msg('PDF indisponível.');
+ const d=new window.jspdf.jsPDF();let y=22;
+ d.setFontSize(18);d.text('WK FRETES',14,y);d.setFontSize(10);y+=7;d.text('Entregas rapidas de moto - Sua entrega esta em boas maos!',14,y);
+ y+=12;d.setFontSize(13);d.text(FL.t,14,y);y+=7;d.text(FL.c,14,y);y+=10;d.setFontSize(11);
+ FL.ln.forEach(a=>{if(y>275){d.addPage();y=20}d.text(String(a[0]),14,y);d.text(String(a[1]),196,y,{align:'right'});y+=7});
+ y+=5;d.setFontSize(13);d.text('Total ('+FL.q+' entregas): '+R(FL.tot),14,y);
+ file('fechamento-'+FL.c.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-'+mes+'.pdf',d.output('blob'))}
+
+function plan(){return `<div class="card"><b>Importar planilha Excel</b><small>Lê a aba Movimentacao_Diaria (data, lançamento, categoria, entradas, saídas). Os meses encontrados são substituídos.</small>
+ <input type="file" accept=".xlsx,.xls" onchange="imp2(this.files[0])"></div>
+ <h3>Exportar</h3><button onclick="exp()">Baixar tudo em Excel (.xlsx)</button>`}
+async function imp(f){
+ if(!f)return;
+ try{
+  const wb=XLSX.read(await f.arrayBuffer(),{type:'array'}),ws=wb.Sheets['Movimentacao_Diaria']||wb.Sheets[wb.SheetNames[0]],n={};
+  XLSX.utils.sheet_to_json(ws,{header:1}).forEach(r=>{
+   if(typeof r[0]!=='number'||!r[2])return;
+   const d=new Date(Date.UTC(1899,11,30)+r[0]*864e5).toISOString().slice(0,10),k=d.slice(0,7);
+   (n[k]=n[k]||[]).push({d,n:String(r[1]||''),c:String(r[2]).trim(),e:+r[3]||0,s:+r[4]||0})});
+  const ks=Object.keys(n).sort();if(!ks.length)return msg('Nenhum lançamento encontrado.');
+  msg('Importando…');for(const k of ks){M[k]=n[k];await save(k)}
+  mes=ks[ks.length-1];tab='painel';msg('Importado: '+ks.length+' mês(es).');draw()
+ }catch(e){msg('Não consegui ler o arquivo.')}}
+const NZ=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+const NU=v=>{if(typeof v==='number')return v;const s=String(v??'').replace(/[^\d,.-]/g,'');if(!s)return 0;return parseFloat(s.includes(',')?s.replace(/\./g,'').replace(',','.'):s)||0};
+const DT=v=>{
+ if(typeof v==='number'&&v>20000&&v<80000)return new Date(Date.UTC(1899,11,30)+Math.floor(v)*864e5).toISOString().slice(0,10);
+ if(v instanceof Date)return v.toISOString().slice(0,10);
+ const s=String(v??'').trim();let m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/);
+ if(m){const y=m[3].length===2?'20'+m[3]:m[3];return y+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0')}
+ m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);return m?m[0]:''};
+async function imp2(f){
+ if(!f)return;
+ try{
+  const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});let best=null;
+  for(const nm of wb.SheetNames){const a=XLSX.utils.sheet_to_json(wb.Sheets[nm],{header:1,raw:true});
+   const hi=a.findIndex(r=>r.some(c=>NZ(c)==='data')&&r.some(c=>/entrad/.test(NZ(c))));
+   if(hi>=0&&(!best||NZ(nm).includes('mov')))best={a,hi}}
+  let a,hi=0,ci={d:0,n:1,c:2,e:3,s:4};
+  if(best){a=best.a;hi=best.hi+1;const h=a[best.hi].map(NZ),g=re=>h.findIndex(x=>re.test(x));
+   ci={d:g(/^data/),n:g(/lanc|descr|cliente|nome/),c:g(/categ/),e:g(/entrad/),s:g(/said/)}}
+  else a=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true});
+  const n={};let ok=0,sk=0,ex='';
+  a.slice(hi).forEach(r=>{
+   if(!r||!r.length||r.every(c=>c===''||c==null))return;
+   const d=DT(r[ci.d]),e=NU(r[ci.e]),s=NU(r[ci.s]),nome=String(r[ci.n]??'').trim();let c=String(r[ci.c]??'').trim();
+   if(!d||(!e&&!s)){if((r[ci.d]!=null&&r[ci.d]!=='')||e||s){sk++;ex=ex||('"'+String(r[ci.d]??'')+'" '+nome)}return}
+   if(!c)c=e>0?'Faturamento':'Outros';
+   const k=d.slice(0,7);(n[k]=n[k]||[]).push({d,n:nome,c,e,s});ok++});
+  const ks=Object.keys(n).sort();
+  if(!ks.length)return msg('Nenhum lançamento encontrado. Confira as colunas: DATA, LANÇAMENTO, CATEGORIA, ENTRADAS, SAÍDAS.');
+  msg('Importando…');for(const k of ks){M[k]=n[k];await save(k)}
+  mes=ks[ks.length-1];tab='painel';draw();
+  msg('Importados '+ok+' lançamentos ('+ks.map(mn).join(', ')+').'+(sk?' Ignoradas '+sk+' linhas, ex.: '+ex:''));clearTimeout(msg.t)
+ }catch(e){msg('Não consegui ler o arquivo.')}}
+async function exp(){
+ const a=[['DATA','LANÇAMENTO','CATEGORIA','ENTRADAS','SAÍDAS']];
+ Object.keys(M).sort().forEach(k=>M[k].forEach(x=>a.push([x.d.split('-').reverse().join('/'),x.n,x.c,x.e||'',x.s||''])));
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a),'Movimentacao_Diaria');
+ file('wk-fretes.xlsx',XLSX.write(wb,{bookType:'xlsx',type:'array'}))}
+
+function draw(keep){
+ const ks=Object.keys(M).sort();
+ $('#ms').innerHTML=ks.map(k=>`<option value="${k}" ${k===mes?'selected':''}>${mn(k)}</option>`).join('')||'<option>Sem dados</option>';
+ $('#tb').innerHTML=[['painel','Painel'],['dias','Dias'],['gastos','Gastos'],['lancar','Lançar'],['fech','Fechar'],['plan','Planilha']].map(([k,t])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';draw()">${t}</button>`).join('');
+ if(keep&&tab==='lancar')return lst();
+ $('#v').innerHTML={painel,dias,gastos,lancar,fech,plan}[tab]();if(tab==='lancar')lst()}
+
+(async()=>{
+ try{const c=window.claude;if(c){const db=await c.use('db');dl=await c.use('downloads');
+  if(db){col=db.collection('meses');
+   col.onSnapshot(s=>{const n={};s.docs.forEach(d=>n[d.id]=(d.data()||{}).rows||[]);M=n;
+    const ks=Object.keys(n).sort();if(!n[mes])mes=ks[ks.length-1]||'';
+    if(first){first=false;if(!ks.length)tab='plan'}draw(true)},()=>msg('Sem conexão com o banco.'))}}}catch(e){}
+ if(!col){try{M=JSON.parse(localStorage.getItem('wk_meses')||'{}')}catch(e){M={}}const ks=Object.keys(M).sort();mes=ks[ks.length-1]||'';if(!ks.length)tab='plan'}
+ draw()})();
+</script></body></html>
