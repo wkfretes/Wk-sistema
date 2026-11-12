@@ -520,7 +520,7 @@ function login(){
  <div id="ts" style="display:flex;justify-content:center"></div>
  <button class="pri" onclick="entrar()">Entrar</button>
  <button onclick="cad(1)">Criar conta</button>
- <button class="x" style="width:100%;font-size:13px" onclick="esqueci()">Esqueci a senha</button></div>
+ <button class="x" style="width:100%;font-size:13px" onclick="esqueciTela()">Esqueci a senha</button></div>
  <div class="trust"><span>🔒 Conexão segura</span><span>👤 Acesso individual por login e senha</span><span>💳 Pagamentos via Mercado Pago</span></div>`;ts()}
 let CAD={n:'',e:'',w:'',s:''};
 function cad(p){
@@ -556,11 +556,20 @@ async function criar(){
  CAD.s='';
  if(data.session)return abrir(data.user);
  $('#v').innerHTML=`<div class="hero"><div class="logo">✓</div><h2>Conta criada!</h2></div><div class="card"><small>Enviamos um e-mail para <b>${E(CAD.e)}</b>. Toque no link para confirmar e depois entre com seu e-mail e senha.</small><button class="pri" onclick="login()">Ir para o login</button></div>`}
+function esqueciTela(){
+ const ev=($('#le')&&$('#le').value.trim())||'';msg('');
+ $('#v').innerHTML=`<div class="hero"><div class="logo">🔑</div><h2>Recuperar senha</h2><p>Informe o e-mail da sua conta. Enviaremos um link para você criar uma nova senha.</p></div>
+ <div class="card"><label>E-mail da conta<input id="fe" type="email" value="${E(ev)}" autocomplete="email" inputmode="email" onkeydown="if(event.key==='Enter')esqueci()"></label>
+ <div id="ts" style="display:flex;justify-content:center"></div>
+ <button class="pri" onclick="esqueci()">Enviar link por e-mail</button>
+ <button onclick="login()">Voltar ao login</button></div>`;ts()}
 async function esqueci(){
- const email=$('#le').value.trim();if(!email)return msg('Digite seu e-mail primeiro.');
+ const email=$('#fe').value.trim();if(!/^\S+@\S+\.\S+$/.test(email))return msg('Digite um e-mail válido.');
  msg('Enviando…');const captchaToken=await tk();
  const{error}=await SB.auth.resetPasswordForEmail(email,{redirectTo:location.href.split('#')[0],captchaToken});
- msg(error?(/captcha/i.test(error.message)?CAPMSG:'Não foi possível enviar o e-mail.'):'Enviamos um link para redefinir a senha.')}
+ if(error)return msg(/captcha/i.test(error.message)?CAPMSG:'Não foi possível enviar o e-mail.');
+ msg('');
+ $('#v').innerHTML=`<div class="hero"><div class="logo">✓</div><h2>Verifique seu e-mail</h2></div><div class="card"><small>Se existir uma conta com <b>${E(email)}</b>, enviamos um link para criar uma nova senha. Confira também a caixa de spam.</small><button class="pri" onclick="login()">Voltar ao login</button></div>`}
 async function sair(){await SB.auth.signOut();location.reload()}
 
 /* ===== A receber (pagamentos a prazo dos clientes) ===== */
