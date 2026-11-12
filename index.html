@@ -85,6 +85,7 @@ header{flex-wrap:wrap;justify-content:center;row-gap:4px;padding:12px 14px 16px}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 /* ===== CONFIGURAÇÃO DO SUPABASE (preencha com os dados do seu projeto) ===== */
@@ -445,8 +446,8 @@ async function iniciarSB(){
  SB=window.supabase.createClient(SB_URL,SB_KEY);
  SB.auth.onAuthStateChange((ev)=>{
   if(ev==='SIGNED_OUT'&&USR)location.reload();
-  if(ev==='PASSWORD_RECOVERY')setTimeout(async()=>{const p=prompt('Digite a nova senha (mínimo 6 caracteres):');
-   if(p&&p.length>=6){const{error}=await SB.auth.updateUser({password:p});msg(error?'Não foi possível trocar a senha.':'Senha alterada.')}},400)});
+  if(ev==='PASSWORD_RECOVERY')setTimeout(async()=>{const p=prompt('Digite a nova senha (mínimo 8 caracteres):');
+   if(p&&p.length>=8){const{error}=await SB.auth.updateUser({password:p});msg(error?'Não foi possível trocar a senha.':'Senha alterada.')}},400)});
  const{data}=await SB.auth.getSession();
  if(data&&data.session)return abrir(data.session.user);
  login()}
@@ -502,6 +503,13 @@ async function setVence(id,v){
  const{error}=await SB.from('acessos').update({vence_em:v||null}).eq('user_id',id);
  if(error)return msg('Não foi possível salvar o vencimento.');
  msg('Vencimento salvo.');ACS=null;draw()}
+const TSK='0x4AAAAAAF9rPMd4AkeK2jKE';let TST='',TSW=null;
+function ts(n){n=n||0;const el=$('#ts');if(!el)return;
+ if(!window.turnstile){if(n<40)setTimeout(()=>ts(n+1),250);return}
+ TST='';el.innerHTML='';try{TSW=turnstile.render(el,{sitekey:TSK,language:'pt-br',callback:t=>{TST=t},'expired-callback':()=>{TST=''},'error-callback':()=>{TST=''}})}catch(e){TSW=null}}
+async function tk(){let n=0;while(!TST&&TSW!==null&&window.turnstile&&n<60){await new Promise(r=>setTimeout(r,250));n++}
+ const t=TST;TST='';try{if(window.turnstile&&TSW!==null)turnstile.reset(TSW)}catch(e){}return t||undefined}
+const CAPMSG='Verificação de segurança não concluída. Aguarde alguns segundos e tente de novo, ou recarregue a página.';
 function login(){
  PERF=null;USR=null;marca();$('#mn').style.display='none';
  $('#tb').style.display='none';$('#ms').style.display='none';$('#so').style.display='none';
@@ -509,46 +517,50 @@ function login(){
  <div class="card"><b>Entrar no sistema</b>
  <label>E-mail<input id="le" type="email" autocomplete="email" inputmode="email"></label>
  <label>Senha<input id="ls" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')entrar()"></label>
+ <div id="ts" style="display:flex;justify-content:center"></div>
  <button class="pri" onclick="entrar()">Entrar</button>
  <button onclick="cad(1)">Criar conta</button>
  <button class="x" style="width:100%;font-size:13px" onclick="esqueci()">Esqueci a senha</button></div>
- <div class="trust"><span>🔒 Conexão segura</span><span>👤 Acesso individual por login e senha</span><span>💳 Pagamentos via Mercado Pago</span></div>`}
+ <div class="trust"><span>🔒 Conexão segura</span><span>👤 Acesso individual por login e senha</span><span>💳 Pagamentos via Mercado Pago</span></div>`;ts()}
 let CAD={n:'',e:'',w:'',s:''};
 function cad(p){
  const bar=`<div class="steps">${[1,2,3].map(i=>`<i class="${i<=p?'on':''}"></i>`).join('')}</div><small>Etapa ${p} de 3</small>`;
  const volta=p===1?'login()':`cad(${p-1})`;
  const c={1:`<b>Seus dados</b><label>Nome completo<input id="cn" value="${E(CAD.n)}" autocomplete="name"></label><label>E-mail<input id="ce" type="email" value="${E(CAD.e)}" autocomplete="email" inputmode="email"></label><label>WhatsApp (opcional)<input id="cw" type="tel" value="${E(CAD.w)}" inputmode="tel"></label>`,
- 2:`<b>Crie sua senha</b><label>Senha (mínimo 6 caracteres)<input id="cs" type="password" autocomplete="new-password"></label><label>Repita a senha<input id="cs2" type="password" autocomplete="new-password"></label>`,
+ 2:`<b>Crie sua senha</b><label>Senha (mínimo 8 caracteres)<input id="cs" type="password" autocomplete="new-password"></label><label>Repita a senha<input id="cs2" type="password" autocomplete="new-password"></label>`,
  3:`<b>Confirme e finalize</b><div class="row"><small>Nome</small><span>${E(CAD.n)}</span></div><div class="row"><small>E-mail</small><span>${E(CAD.e)}</span></div>${CAD.w?`<div class="row"><small>WhatsApp</small><span>${E(CAD.w)}</span></div>`:''}<label class="chk"><input id="ct" type="checkbox"><span>Li e concordo com os <a href="termos.html" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>.</span></label><small>Depois de criar, você recebe um e-mail para confirmar. O acesso é liberado após a aprovação ou o pagamento do plano.</small>`}[p];
- $('#v').innerHTML=`<div class="hero"><div class="logo">WK</div><h2>Criar conta</h2></div><div class="card">${bar}${c}<button class="pri" onclick="${p===3?'criar()':`cadNext(${p})`}">${p===3?'Criar minha conta':'Continuar'}</button><button onclick="${volta}">Voltar</button></div>`}
+ $('#v').innerHTML=`<div class="hero"><div class="logo">WK</div><h2>Criar conta</h2></div><div class="card">${bar}${c}${p===3?'<div id="ts" style="display:flex;justify-content:center"></div>':''}<button class="pri" onclick="${p===3?'criar()':`cadNext(${p})`}">${p===3?'Criar minha conta':'Continuar'}</button><button onclick="${volta}">Voltar</button></div>`;if(p===3)ts()}
 function cadNext(p){
  if(p===1){const n=$('#cn').value.trim(),e=$('#ce').value.trim();
   if(n.length<3)return msg('Informe seu nome completo.');
   if(!/^\S+@\S+\.\S+$/.test(e))return msg('Informe um e-mail válido.');
   CAD.n=n;CAD.e=e;CAD.w=$('#cw').value.trim();return cad(2)}
  if(p===2){const a=$('#cs').value,b=$('#cs2').value;
-  if(a.length<6)return msg('A senha precisa ter pelo menos 6 caracteres.');
+  if(a.length<8)return msg('A senha precisa ter pelo menos 8 caracteres.');
   if(a!==b)return msg('As senhas não são iguais.');
   CAD.s=a;cad(3)}}
 async function entrar(){
  const email=$('#le').value.trim(),password=$('#ls').value;
  if(!email||!password)return msg('Informe e-mail e senha.');
  msg('Entrando…');
- const{data,error}=await SB.auth.signInWithPassword({email,password});
- if(error)return msg(/confirm/i.test(error.message)?'Confirme seu e-mail antes de entrar.':'E-mail ou senha incorretos.');
+ const captchaToken=await tk();
+ const{data,error}=await SB.auth.signInWithPassword({email,password,options:{captchaToken}});
+ if(error)return msg(/captcha/i.test(error.message)?CAPMSG:/confirm/i.test(error.message)?'Confirme seu e-mail antes de entrar.':'E-mail ou senha incorretos.');
  msg('');abrir(data.user)}
 async function criar(){
  if(!$('#ct').checked)return msg('Marque a concordância para continuar.');
  msg('Criando conta…');
- const{data,error}=await SB.auth.signUp({email:CAD.e,password:CAD.s,options:{data:{nome:CAD.n,whatsapp:CAD.w,aceite_termos:new Date().toISOString(),versao_termos:'2026-11-11'},emailRedirectTo:location.href.split('#')[0].split('?')[0]}});
- if(error)return msg('Não foi possível criar a conta: '+error.message);
+ const captchaToken=await tk();
+ const{data,error}=await SB.auth.signUp({email:CAD.e,password:CAD.s,options:{captchaToken,data:{nome:CAD.n,whatsapp:CAD.w,aceite_termos:new Date().toISOString(),versao_termos:'2026-11-11'},emailRedirectTo:location.href.split('#')[0].split('?')[0]}});
+ if(error)return msg(/captcha/i.test(error.message)?CAPMSG:'Não foi possível criar a conta: '+error.message);
  CAD.s='';
  if(data.session)return abrir(data.user);
  $('#v').innerHTML=`<div class="hero"><div class="logo">✓</div><h2>Conta criada!</h2></div><div class="card"><small>Enviamos um e-mail para <b>${E(CAD.e)}</b>. Toque no link para confirmar e depois entre com seu e-mail e senha.</small><button class="pri" onclick="login()">Ir para o login</button></div>`}
 async function esqueci(){
  const email=$('#le').value.trim();if(!email)return msg('Digite seu e-mail primeiro.');
- const{error}=await SB.auth.resetPasswordForEmail(email,{redirectTo:location.href.split('#')[0]});
- msg(error?'Não foi possível enviar o e-mail.':'Enviamos um link para redefinir a senha.')}
+ msg('Enviando…');const captchaToken=await tk();
+ const{error}=await SB.auth.resetPasswordForEmail(email,{redirectTo:location.href.split('#')[0],captchaToken});
+ msg(error?(/captcha/i.test(error.message)?CAPMSG:'Não foi possível enviar o e-mail.'):'Enviamos um link para redefinir a senha.')}
 async function sair(){await SB.auth.signOut();location.reload()}
 
 /* ===== A receber (pagamentos a prazo dos clientes) ===== */
@@ -643,7 +655,7 @@ function conta(){
  <label>Novo e-mail<input id="ne" type="email" autocomplete="email"></label>
  <button onclick="trocarEmail()">Alterar e-mail</button></div>
  <div class="card" id="s-senha"><b>Alterar senha</b>
- <label>Nova senha (mínimo 6 caracteres)<input id="np" type="password" autocomplete="new-password"></label>
+ <label>Nova senha (mínimo 8 caracteres)<input id="np" type="password" autocomplete="new-password"></label>
  <label>Repita a nova senha<input id="np2" type="password" autocomplete="new-password"></label>
  <button onclick="trocarSenha()">Alterar senha</button></div>`}
 function logoSel(inp){
@@ -675,7 +687,7 @@ async function trocarEmail(){
  $('#ne').value='';msg('Enviamos um link de confirmação. O e-mail só muda depois que você confirmar.')}
 async function trocarSenha(){
  const a=$('#np').value,b=$('#np2').value;
- if(a.length<6)return msg('A senha precisa ter pelo menos 6 caracteres.');
+ if(a.length<8)return msg('A senha precisa ter pelo menos 8 caracteres.');
  if(a!==b)return msg('As senhas não são iguais.');
  const{error}=await SB.auth.updateUser({password:a});
  if(error)return msg('Não foi possível alterar a senha: '+error.message);
