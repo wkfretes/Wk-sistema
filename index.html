@@ -114,6 +114,26 @@ async function save(k){if(!col)return msg('Sem banco de dados: os dados valem s�
 async function file(name,data){if(!dl)return msg('Download indisponível neste modo.');try{await dl.save({filename:name,data})}catch(e){msg('Download cancelado.')}}
 function calc(r){let f=0,v=0,fe=0,pe=0;r.forEach(x=>{f+=x.e||0;const g=GRP(x.c),s=x.s||0;if(g==='pes')pe+=s;else if(g==='fix')fe+=s;else v+=s});return{f,v,fe,pe,luc:f-v-fe,sob:f-v-fe-pe}}
 
+const FLX='display:flex;justify-content:space-between;align-items:center;gap:8px';
+function metaDe(k){const ks=Object.keys(FX).filter(x=>x<=k&&FX[x]&&FX[x]._meta!==undefined).sort();return ks.length?Math.max(0,+FX[ks.pop()]._meta||0):0}
+function metaCard(c){const m=metaDe(mes),f=c.f,ab=`$('#mtf').style.display='';this.style.display='none'`;
+ const form=`<div id="mtf" style="display:none"><label>Meta de faturamento deste mês (R$)<input id="mtv" type="number" inputmode="decimal" step="0.01" value="${m||''}"></label><button class="pri" onclick="salvarMeta()">Salvar meta</button><small>Deixe 0 para tirar a meta. A meta vale também para os próximos meses até você mudar.</small></div>`;
+ if(!m)return `<div class="card" style="margin-bottom:10px"><b>🎯 Meta do mês</b><small>Defina quanto quer faturar neste mês e acompanhe o progresso aqui.</small><button onclick="${ab}">Definir meta</button>${form}</div>`;
+ const p=Math.min(100,f/m*100),falta=Math.max(0,m-f);let dia='';
+ if(falta>0&&mes===hoje().slice(0,7)){const fimM=new Date(+mes.slice(0,4),+mes.slice(5,7),0).getDate(),rest=fimM-+hoje().slice(8)+1;dia=`<small>Para bater, precisa de <b>${R(falta/rest)} por dia</b> nos ${rest} ${rest===1?'dia que falta':'dias que faltam'}.</small>`}
+ return `<div class="card" style="margin-bottom:10px"><div style="${FLX}"><b>🎯 Meta do mês</b><b class="${f>=m?'ok':''}">${p.toFixed(0)}%</b></div>
+ <div style="height:14px;background:var(--bd);border-radius:99px;overflow:hidden"><i style="display:block;height:100%;width:${p.toFixed(1)}%;background:${f>=m?'var(--ok)':'var(--ac)'};border-radius:99px"></i></div>
+ <small>${R(f)} de ${R(m)} · ${falta>0?'faltam <b>'+R(falta)+'</b>':'<b class="ok">meta batida! 🎉</b>'}</small>${dia}<button onclick="${ab}">Alterar meta</button>${form}</div>`}
+function salvarMeta(){const v=+$('#mtv').value;if(!(v>=0))return msg('Digite um valor válido.');FX[mes]=FX[mes]||{};FX[mes]._meta=v;save(mes);msg(v>0?'Meta salva.':'Meta removida.');draw()}
+function saldoAnt(k){let t=+(CFG.ci||0);Object.keys(M).filter(x=>x<k).forEach(x=>{t+=calc(M[x]||[]).sob});return t}
+function caixaCard(c){const a=saldoAnt(mes),t=a+c.sob,ab=`$('#cif').style.display='';this.style.display='none'`;
+ return `<div class="card" style="margin:10px 0"><b>💰 Caixa acumulado</b>
+ <div class="row"><span>Saldo dos meses anteriores${+CFG.ci?' <small>(com caixa inicial de '+R(+CFG.ci)+')</small>':''}</span><b class="${a<0?'bad':''}">${R(a)}</b></div>
+ <div class="row"><span>Sobra deste mês</span><b class="${c.sob<0?'bad':'ok'}">${c.sob<0?'':'+'}${R(c.sob)}</b></div>
+ <div style="${FLX}"><b>Caixa até agora</b><b class="${t<0?'bad':'ok'}" style="font-size:22px">${R(t)}</b></div>
+ <small>Estimativa: soma do que sobrou em cada mês (faturado − despesas − retiradas). Valores a receber só entram quando o cliente paga.</small>
+ <button onclick="${ab}">${+CFG.ci?'Alterar':'Informar'} caixa inicial</button><div id="cif" style="display:none"><label>Dinheiro que você já tinha guardado antes de começar a usar o sistema (R$)<input id="civ" type="number" inputmode="decimal" step="0.01" value="${+CFG.ci||''}"></label><button class="pri" onclick="salvarCI()">Salvar</button></div></div>`}
+function salvarCI(){const v=+$('#civ').value||0;cfg().ci=v;saveAll();msg('Caixa inicial salvo.');draw()}
 function faltaCard(c){
  const r=rows(),fx=FX[mes]||{},td=hoje();
  const pf=k=>{const ks=Object.keys(FX).filter(m=>m<mes&&k in FX[m]).sort();return ks.length?+FX[ks.pop()][k]||0:0};
@@ -140,7 +160,7 @@ function painel(){
  const k=(t,v,s='')=>`<div class="k"><small>${t}</small><b class="${s}">${v}</b></div>`;
  if(!r.length)return '<p>Nenhum dado ainda. Vá em <b>Planilha</b> e importe seu Excel, ou use <b>Lançar</b>.</p>';
  const fp=faltaCard(c);
- return `<div class="g">${k('Faturamento',R(c.f))}${k('Variáveis (empresa)',R(c.v))}${k('Fixos da empresa',R(c.fe))}${k('Lucro da empresa',R(c.luc),c.luc<0?'bad':'ok')}${k('Pessoal (retirada)',R(c.pe))}${k('Sobra do caixa',R(c.sob),c.sob<0?'bad':'ok')}${k('Margem da empresa',c.f?(c.luc/c.f*100).toFixed(1)+'%':'-')}${k('Ticket médio',n?R(c.f/n):'-')}</div>${fp}
+ return `${metaCard(c)}<div class="g">${k('Faturamento',R(c.f))}${k('Variáveis (empresa)',R(c.v))}${k('Fixos da empresa',R(c.fe))}${k('Lucro da empresa',R(c.luc),c.luc<0?'bad':'ok')}${k('Pessoal (retirada)',R(c.pe))}${k('Sobra do caixa',R(c.sob),c.sob<0?'bad':'ok')}${k('Margem da empresa',c.f?(c.luc/c.f*100).toFixed(1)+'%':'-')}${k('Ticket médio',n?R(c.f/n):'-')}</div>${caixaCard(c)}${fp}
  <h3>Faturamento por dia</h3><div class="ch">${ds.map(d=>`<div class="b" title="${R(di[d])}"><i style="height:${Math.round(di[d]/mx*92)}px"></i><span>${d.slice(8)}</span></div>`).join('')}</div>
  <h3>Melhores clientes</h3>${top.map(([a,[q,v]])=>`<div class="row"><span>${E(a)} <small>${q} entregas</small></span><b>${R(v)}</b></div>`).join('')}`}
 
@@ -176,17 +196,28 @@ function gastos(){
 function lancar(){
  const h=new Date(),t=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');
  const nm=[...new Set(Object.values(M).flat().filter(x=>x.c==='Faturamento').map(x=>x.n))].sort(),fls=[...new Set(Object.values(M).flat().filter(x=>x.c==='Freelancer').map(x=>x.n))].sort();
- return `<div class="card"><label>Data<input id="fd" type="date" value="${t}" onchange="lst()"></label>
+ const u=ult();
+ return `<div class="card">${u?`<button onclick="repetir()">↻ Repetir último: ${E(u.n)} · ${R(u.e||u.s)}</button>`:''}<label>Data<input id="fd" type="date" value="${t}" onchange="lst()"></label>
  <label>Tipo<select id="ft" onchange="tp()"><option>Entrada</option><option>Saída</option></select></label>
  <label id="lw">Pagamento<select id="fw" onchange="tp()"><option>À vista</option><option>A prazo</option></select></label>
  <div id="lx" class="card" style="display:none;background:var(--bg)"><label>Forma de pagamento<select id="xf"><option>Pix</option><option>Boleto</option><option>Dinheiro</option></select></label><label>Parcelas<select id="xn">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}">${n===1?"1x":n+"x (uma por mês)"}</option>`).join("")}</select></label><label>Vencimento (1ª parcela)<input id="xt" type="date" value="${t}"></label><small>Vai para <b>A receber</b>. Entra no Faturamento quando você marcar como recebido. O pagamento do freelancer (se informado abaixo) é lançado agora como saída, na data do lançamento.</small></div>
  <label>Cliente / descrição<input id="fn" list="nl" autocomplete="off"></label><datalist id="nl">${nm.map(n=>`<option value="${E(n)}">`).join('')}</datalist>
  <label id="lc" style="display:none">Categoria<select id="fc">${(()=>{const fl=FIXL(),o=a=>a.map(c=>`<option>${E(c)}</option>`).join('');return `<optgroup label="Empresa · variáveis">${o(VARL())}</optgroup><optgroup label="Empresa · fixas">${o(fl.filter(c=>GRP(c)==='fix'))}</optgroup><optgroup label="Pessoal">${o(fl.filter(c=>GRP(c)==='pes'))}</optgroup>`})()}</select></label>
- <label>Valor (R$)<input id="fv" type="number" inputmode="decimal" step="0.01"></label>
+ <label id="lq">Quantidade de entregas<input id="fq" type="number" inputmode="numeric" min="1" max="100" step="1" value="1" oninput="qt()"></label>
+ <label><span id="fvl">Valor por entrega (R$)</span><input id="fv" type="number" inputmode="decimal" step="0.01" oninput="qt()"></label>
  <label id="lf">Freelancer que fez a entrega (opcional)<input id="ff" list="fl" autocomplete="off"></label><datalist id="fl">${fls.map(n=>`<option value="${E(n)}">`).join('')}</datalist>
- <label id="lp">Pago ao freelancer (R$)<input id="fp" type="number" inputmode="decimal" step="0.01"></label>
+ <label id="lp">Pago ao freelancer (R$)<input id="fp" type="number" inputmode="decimal" step="0.01" oninput="qt()"></label>
+ <small id="fqt" style="display:none"></small>
  <button id="fb" class="pri" onclick="add()">Salvar lançamento</button><button id="fcx" style="display:none" onclick="cx()">Cancelar edição</button></div><h3>Lançamentos da data escolhida</h3><div id="lst"></div>`}
-function tp(){const s=$('#ft').value==='Saída',pz=!s&&!ed&&$('#fw').value==='A prazo';$('#lc').style.display=s?'':'none';$('#lw').style.display=(s||ed)?'none':'';$('#lx').style.display=pz?'':'none';$('#lf').style.display=s?'none':'';$('#lp').style.display=s?'none':''}
+function tp(){const s=$('#ft').value==='Saída',pz=!s&&!ed&&$('#fw').value==='A prazo';$('#lc').style.display=s?'':'none';$('#lw').style.display=(s||ed)?'none':'';$('#lx').style.display=pz?'':'none';$('#lf').style.display=s?'none':'';$('#lp').style.display=s?'none':'';const vq=!s&&!ed&&!pz;$('#lq').style.display=vq?'':'none';$('#fvl').textContent=vq?'Valor por entrega (R$)':'Valor (R$)';if(!vq)$('#fq').value=1;qt()}
+function nqt(){const q=$('#fq');return q&&$('#lq').style.display!=='none'?Math.max(1,Math.min(100,Math.floor(+q.value)||1)):1}
+function qt(){const e=$('#fqt');if(!e)return;const n=nqt(),v=+$('#fv').value||0,p=+$('#fp').value||0;if(n<2){e.style.display='none';return}
+ e.style.display='';e.innerHTML=`Serão lançadas <b>${n} entregas</b> de ${R(v)} = <b>${R(n*v)}</b>${p>0?` · freelancer: ${n} × ${R(p)} = ${R(n*p)}`:''}`}
+function ult(){const ks=Object.keys(M).sort().reverse();for(const k of ks){const a=M[k]||[];for(let i=a.length-1;i>=0;i--){const x=a[i];if(x.r||(x.c==='Freelancer'&&x.l))continue;return x}}return null}
+function repetir(){const x=ult();if(!x)return msg('Nenhum lançamento para repetir.');cx(1);
+ $('#ft').value=x.s?'Saída':'Entrada';$('#fw').value='À vista';tp();$('#fn').value=x.n;
+ if(x.s){const f=$('#fc');if(![...f.options].some(o=>o.value===x.c))f.add(new Option(x.c));f.value=x.c}
+ $('#fv').value=x.s||x.e;$('#ff').value=x.f||'';$('#fp').value=x.p||'';qt();msg('Preenchi com o último lançamento. Confira a data e toque em Salvar.')}
 const kk=()=>{const d=$('#fd');return d&&d.value?d.value.slice(0,7):mes};
 const hoje=()=>{const h=new Date();return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0')};
 function lst(){
@@ -196,14 +227,15 @@ function add(){
  const d=$('#fd').value,n=$('#fn').value.trim(),v=+$('#fv').value,s=$('#ft').value==='Saída';
  if(!d||!n||!(v>0))return msg('Preencha data, nome e valor.');
  if(!s&&!ed&&$('#fw').value==='A prazo')return addPrazo(d,n,v);
- const k=d.slice(0,7),was=ed,fn=s?'':$('#ff').value.trim(),fp=s?0:(+$('#fp').value||0);
+ const k=d.slice(0,7),was=ed,fn=s?'':$('#ff').value.trim(),fp=s?0:(+$('#fp').value||0),nq=(s||was)?1:nqt();
  if(fp>0&&!fn)return msg('Informe o nome do freelancer.');
- let l=uid();
- if(was){const old=(M[was.k]||[])[was.i];if(old&&old.l)l=old.l;M[was.k]=M[was.k].filter((y,j)=>j!==was.i&&!(old&&old.l&&y.l===old.l));save(was.k)}
- const x={d,n,c:s?$('#fc').value:'Faturamento',e:s?0:v,s:s?v:0},novos=[x];
- if(!s&&fn){x.f=fn;x.p=fp;x.l=l;if(fp>0)novos.push({d,n:fn,c:'Freelancer',e:0,s:fp,l})}
- M[k]=[...(M[k]||[]),...novos];mes=k;save(k);cx(1);msg(was?'Lançamento alterado.':'Lançamento salvo.');draw(true)}
-function cx(q){ed=null;const b=$('#fb');if(!b)return;b.textContent='Salvar lançamento';$('#fcx').style.display='none';$('#fn').value='';$('#fv').value='';$('#ff').value='';$('#fp').value=''}
+ let l0=null;
+ if(was){const old=(M[was.k]||[])[was.i];if(old&&old.l)l0=old.l;M[was.k]=M[was.k].filter((y,j)=>j!==was.i&&!(old&&old.l&&y.l===old.l));save(was.k)}
+ const novos=[];
+ for(let q=0;q<nq;q++){const l=(q===0&&l0)||uid(),x={d,n,c:s?$('#fc').value:'Faturamento',e:s?0:v,s:s?v:0};novos.push(x);
+  if(!s&&fn){x.f=fn;x.p=fp;x.l=l;if(fp>0)novos.push({d,n:fn,c:'Freelancer',e:0,s:fp,l})}}
+ M[k]=[...(M[k]||[]),...novos];mes=k;save(k);cx(1);msg(was?'Lançamento alterado.':nq>1?nq+' entregas salvas ('+R(nq*v)+').':'Lançamento salvo.');draw(true)}
+function cx(q){ed=null;const b=$('#fb');if(!b)return;b.textContent='Salvar lançamento';$('#fcx').style.display='none';$('#fn').value='';$('#fv').value='';$('#ff').value='';$('#fp').value='';if($('#fq')){$('#fq').value=1;qt()}}
 function edit(k,i){
  let x=(M[k]||[])[i];if(!x)return;if(x.l&&x.s>0){const j=M[k].findIndex(y=>y.l===x.l&&y.e>0);if(j>=0){i=j;x=M[k][j]}}ed={k,i};tab='lancar';mes=k;draw();
  $('#fd').value=x.d;$('#ft').value=x.s?'Saída':'Entrada';tp();$('#fn').value=x.n;
