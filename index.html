@@ -155,25 +155,24 @@ function semanas(){
  const iso=t=>t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
  const g={};rows().forEach(x=>{const t=new Date(x.d+'T12:00');t.setDate(t.getDate()-(t.getDay()+6)%7);const k=iso(t);(g[k]=g[k]||[]).push(x)});
  const ks=Object.keys(g).sort();if(!ks.length)return '<p>Sem dados neste mês.</p>';
- const ini=mes+'-01',fim=mes+'-'+String(new Date(+mes.slice(0,4),+mes.slice(5,7),0).getDate()).padStart(2,'0');
- let ant=null,tf=0,ts=0;
- const h=ks.map((k,i)=>{const l=g[k],f=l.reduce((a,x)=>a+(x.e||0),0),d=l.reduce((a,x)=>a+(GRP(x.c)==='pes'?0:(x.s||0)),0),q=l.filter(x=>x.c==='Faturamento'&&x.q!==0).length,lu=f-d;
-  const e=new Date(k+'T12:00');e.setDate(e.getDate()+6);const a=k<ini?ini:k,b=iso(e)>fim?fim:iso(e);
-  let cp='';if(ant!==null&&ant!==0){const p=(lu-ant)/Math.abs(ant)*100;cp=`<small class="${p>=0?'ok':'bad'}">${p>=0?'▲':'▼'} ${Math.abs(p).toFixed(0)}% vs. semana anterior</small>`}
-  ant=lu;tf+=f;ts+=d;
-  const ds=[...new Set(l.map(x=>x.d))].sort().map(dd=>{const z=l.filter(x=>x.d===dd),zf=z.reduce((a,x)=>a+(x.e||0),0),zs=z.reduce((a,x)=>a+(GRP(x.c)==='pes'?0:(x.s||0)),0);return `<div class="row"><small>${fd(dd)} · ${z.filter(x=>x.c==='Faturamento'&&x.q!==0).length} entregas</small><span>${R(zf)} <small class="bad">−${R(zs)}</small> <b>${R(zf-zs)}</b></span></div>`}).join('');
-  return `<details><summary class="row"><span><b>Semana ${i+1}</b> <small>${fd(a)} a ${fd(b)} · ${q} entregas</small><br>${cp}</span><span><small>Faturado ${R(f)}</small><br><small class="bad">Despesas −${R(d)}</small><br><b class="${lu>=0?'ok':'bad'}">Lucro ${R(lu)}</b></span></summary>${ds}</details>`}).reverse().join('');
- return `<small>Semanas de segunda a domingo, cortadas no mês selecionado. Lucro = faturado − despesas da empresa (gastos pessoais não entram). Toque na semana para ver os dias.</small>${h}<div class="row"><b>Total do mês</b><span><b class="ok">${R(tf)}</b> <small class="bad">−${R(ts)}</small> <b>${R(tf-ts)}</b></span></div>`}
+ const ini=mes+'-01',fim=mes+'-'+String(new Date(+mes.slice(0,4),+mes.slice(5,7),0).getDate()).padStart(2,'0'),hj=hoje();
+ const sg=(l,grp)=>l.reduce((a,x)=>a+(GRP(x.c)===grp?(x.s||0):0),0);
+ let ant=null,tf=0,ts=0,ac=0;
+ const h=ks.map((k,i)=>{const l=g[k],f=l.reduce((a,x)=>a+(x.e||0),0),dv=sg(l,'var'),dx=sg(l,'fix'),d=dv+dx,q=l.filter(x=>x.c==='Faturamento'&&x.q!==0).length,lu=f-d,op=f-dv;
+  const e=new Date(k+'T12:00');e.setDate(e.getDate()+6);const a=k<ini?ini:k,b=iso(e)>fim?fim:iso(e),and=hj>=k&&hj<=iso(e);
+  ac+=lu;
+  let cp='';if(and)cp='<small>⏳ Semana em andamento</small>';else if(ant!==null&&ant!==0){const p=(op-ant)/Math.abs(ant)*100;cp=`<small class="${p>=0?'ok':'bad'}">${p>=0?'▲':'▼'} ${Math.abs(p).toFixed(0)}% vs. semana anterior (sem contar fixos)</small>`}
+  ant=op;tf+=f;ts+=d;
+  const ds=[...new Set(l.map(x=>x.d))].sort().map(dd=>{const z=l.filter(x=>x.d===dd),zf=z.reduce((a,x)=>a+(x.e||0),0),zs=z.reduce((a,x)=>a+(GRP(x.c)==='pes'?0:(x.s||0)),0),zx=sg(z,'fix');return `<div class="row"><small>${fd(dd)} · ${z.filter(x=>x.c==='Faturamento'&&x.q!==0).length} entregas${zx>0?' · fixos pagos '+R(zx):''}</small><span>${R(zf)} <small class="bad">−${R(zs)}</small> <b>${R(zf-zs)}</b></span></div>`}).join('');
+  return `<details><summary class="row"><span><b>Semana ${i+1}</b> <small>${fd(a)} a ${fd(b)} · ${q} entregas</small><br>${cp}</span><span class="r"><small>Faturado ${R(f)}</small><br><small class="bad">Despesas −${R(d)}</small>${dx>0?`<br><small>fixos ${R(dx)} · variáveis ${R(dv)}</small>`:''}<br><b class="${lu>=0?'ok':'bad'}">Lucro ${R(lu)}</b>${dx>0?`<br><small class="${op>=0?'ok':'bad'}">Sem os fixos: ${R(op)}</small>`:''}<br><small>Acumulado no mês: <b class="${ac>=0?'ok':'bad'}">${R(ac)}</b></small></span></summary>${ds}</details>`}).reverse().join('');
+ return `<small>Semanas de segunda a domingo, cortadas no mês selecionado. Lucro = faturado − despesas da empresa (gastos pessoais não entram). Custos fixos contam na semana em que foram pagos; por isso cada semana mostra também o resultado sem os fixos e o <b>acumulado no mês</b>, que é o que a empresa já somou até ali. Toque na semana para ver os dias.</small>${h}<div class="row"><b>Total do mês</b><span><b class="ok">${R(tf)}</b> <small class="bad">−${R(ts)}</small> <b class="${tf-ts>=0?'ok':'bad'}">${R(tf-ts)}</b></span></div>`}
 function gastos(){
  const r=rows().filter(x=>x.s>0);if(!r.length)return '<p>Sem despesas neste mês.</p>';
  const g={};r.forEach(x=>{g[x.c]=g[x.c]||[0,[]];g[x.c][0]+=x.s;g[x.c][1].push(x)});
  const t=r.reduce((a,x)=>a+x.s,0);
  const gt={fix:0,var:0,pes:0};r.forEach(x=>gt[GRP(x.c)]+=x.s);
  const gh=['var','fix','pes'].map(g=>`<div class="row"><span>${GN[g]} <small>${(gt[g]/t*100).toFixed(0)}%</small></span><b>${R(gt[g])}</b></div>`).join('');
- const fz={};r.filter(x=>x.c==='Freelancer').forEach(x=>{(fz[x.n]=fz[x.n]||[]).push(x)});
- const fl=Object.entries(fz).map(([n,l])=>[n,l,l.reduce((a,x)=>a+x.s,0)]).sort((a,b)=>b[2]-a[2]),ft=fl.reduce((a,x)=>a+x[2],0);
- const fh=fl.map(([n,l,v])=>`<details><summary class="row"><span>${E(n)} <small>${l.length} entregas · média ${R(v/l.length)}</small></span><b>${R(v)}</b></summary>${l.sort((a,b)=>a.d<b.d?1:-1).map(x=>`<div class="row"><small>${fd(x.d)}${(q=>q?' · '+E(q.n)+' · cliente pagou '+R(q.e)+' · lucro '+R(q.e-x.s):'')(x.l&&rows().find(z=>z.l===x.l&&z.e>0))}</small><span>${R(x.s)}</span></div>`).join('')}</details>`).join('');
- return `<div class="k"><small>Total de despesas</small><b class="bad">${R(t)}</b></div><h3>Por grupo</h3>${gh}<h3>Freelancers · ${R(ft)}</h3>${fh||'<small>Nenhum freelancer neste mês.</small>'}<h3>Por categoria · toque para detalhar</h3>`+Object.entries(g).sort((a,b)=>b[1][0]-a[1][0]).map(([c,[v,l]])=>`<details><summary class="row"><span>${E(c)} <small>${GN[GRP(c)]} · ${(v/t*100).toFixed(0)}% · ${l.length} lanç.</small></span><b>${R(v)}</b></summary>${l.sort((a,b)=>a.d<b.d?1:-1).map(x=>`<div class="row"><small>${fd(x.d)} · ${E(x.n)}</small><span>${R(x.s)}</span></div>`).join('')}</details>`).join('')}
+ return `<div class="k"><small>Total de despesas</small><b class="bad">${R(t)}</b></div><h3>Por grupo</h3>${gh}<h3>Por categoria · toque para detalhar</h3>`+Object.entries(g).sort((a,b)=>b[1][0]-a[1][0]).map(([c,[v,l]])=>`<details><summary class="row"><span>${E(c)} <small>${GN[GRP(c)]} · ${(v/t*100).toFixed(0)}% · ${l.length} lanç.</small></span><b>${R(v)}</b></summary>${l.sort((a,b)=>a.d<b.d?1:-1).map(x=>`<div class="row"><small>${fd(x.d)} · ${E(x.n)}</small><span>${R(x.s)}</span></div>`).join('')}</details>`).join('')}
 function lancar(){
  const h=new Date(),t=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');
  const nm=[...new Set(Object.values(M).flat().filter(x=>x.c==='Faturamento').map(x=>x.n))].sort(),fls=[...new Set(Object.values(M).flat().filter(x=>x.c==='Freelancer').map(x=>x.n))].sort();
