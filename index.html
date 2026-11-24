@@ -125,15 +125,19 @@ function metaCard(c){const m=metaDe(mes),f=c.f,ab=`$('#mtf').style.display='';th
  <div style="height:14px;background:var(--bd);border-radius:99px;overflow:hidden"><i style="display:block;height:100%;width:${p.toFixed(1)}%;background:${f>=m?'var(--ok)':'var(--ac)'};border-radius:99px"></i></div>
  <small>${R(f)} de ${R(m)} · ${falta>0?'faltam <b>'+R(falta)+'</b>':'<b class="ok">meta batida! 🎉</b>'}</small>${dia}<button onclick="${ab}">Alterar meta</button>${form}</div>`}
 function salvarMeta(){const v=+$('#mtv').value;if(!(v>=0))return msg('Digite um valor válido.');FX[mes]=FX[mes]||{};FX[mes]._meta=v;save(mes);msg(v>0?'Meta salva.':'Meta removida.');draw()}
-function saldoAnt(k){let t=+(CFG.ci||0);Object.keys(M).filter(x=>x<k).forEach(x=>{t+=calc(M[x]||[]).sob});return t}
-function caixaCard(c){const a=saldoAnt(mes),t=a+c.sob,ab=`$('#cif').style.display='';this.style.display='none'`;
+function ajs(){return CFG.ajs||[]}
+function saldoAnt(k){let t=+(CFG.ci||0);Object.keys(M).filter(x=>x<k).forEach(x=>{t+=calc(M[x]||[]).sob});return t+ajs().filter(a=>a.m<k).reduce((s,a)=>s+(+a.v||0),0)}
+function caixaCard(c){const a=saldoAnt(mes),aj=ajs().find(x=>x.m===mes),t=a+c.sob+(aj?+aj.v||0:0),ul=ajs().slice().sort((x,y)=>x.d<y.d?1:-1)[0],ab=`$('#cif').style.display='';this.style.display='none'`;
  return `<div class="card" style="margin:10px 0"><b>💰 Caixa acumulado</b>
  <div class="row"><span>Saldo dos meses anteriores${+CFG.ci?' <small>(com caixa inicial de '+R(+CFG.ci)+')</small>':''}</span><b class="${a<0?'bad':''}">${R(a)}</b></div>
  <div class="row"><span>Sobra deste mês</span><b class="${c.sob<0?'bad':'ok'}">${c.sob<0?'':'+'}${R(c.sob)}</b></div>
+ ${aj?`<div class="row"><span>Correção do saldo <small>(feita em ${fd(aj.d)})</small></span><b class="${aj.v<0?'bad':'ok'}">${aj.v<0?'':'+'}${R(aj.v)}</b></div>`:''}
  <div style="${FLX}"><b>Caixa até agora</b><b class="${t<0?'bad':'ok'}" style="font-size:22px">${R(t)}</b></div>
- <small>Estimativa: soma do que sobrou em cada mês (faturado − despesas − retiradas). Valores a receber só entram quando o cliente paga.</small>
- <button onclick="${ab}">${+CFG.ci?'Alterar':'Informar'} caixa inicial</button><div id="cif" style="display:none"><label>Dinheiro que você já tinha guardado antes de começar a usar o sistema (R$)<input id="civ" type="number" inputmode="decimal" step="0.01" value="${+CFG.ci||''}"></label><button class="pri" onclick="salvarCI()">Salvar</button></div></div>`}
-function salvarCI(){const v=+$('#civ').value||0;cfg().ci=v;saveAll();msg('Caixa inicial salvo.');draw()}
+ <small>${ul?`Você informou que tinha <b>${R(ul.r)}</b> no caixa em ${fd(ul.d)}. A partir daí o sistema soma as entradas e tira as saídas que você lançar.`:'Estimativa: soma do que sobrou em cada mês (faturado − despesas − retiradas). Se o dinheiro que você tem de verdade for diferente, corrija abaixo.'}</small>
+ <button onclick="${ab}">✏️ Corrigir saldo do caixa</button><div id="cif" style="display:none"><label>Quanto você tem de verdade no caixa agora? (R$)<input id="civ" type="number" inputmode="decimal" step="0.01" value="${(Math.round(t*100)/100).toFixed(2)}"></label><button class="pri" onclick="salvarAj()">Salvar saldo</button><small>Conte o dinheiro guardado (conta + dinheiro em mãos) e digite aqui. O sistema guarda a diferença como uma correção, sem mexer nos seus lançamentos.</small>${aj?'<button onclick="desfazAj()">Desfazer a correção deste mês</button>':''}</div></div>`}
+function salvarAj(){const el=$('#civ');if(!el||el.value.trim()==='')return msg('Digite o valor que você tem no caixa.');const v=+el.value;if(isNaN(v))return msg('Digite um valor válido.');
+ const C=cfg();C.ajs=(C.ajs||[]).filter(a=>a.m!==mes);const est=saldoAnt(mes)+calc(rows()).sob;C.ajs.push({m:mes,v:Math.round((v-est)*100)/100,d:hoje(),r:v});saveAll();msg('Saldo do caixa corrigido.');draw()}
+function desfazAj(){const C=cfg();C.ajs=(C.ajs||[]).filter(a=>a.m!==mes);saveAll();msg('Correção removida.');draw()}
 function faltaCard(c){
  const r=rows(),fx=FX[mes]||{},td=hoje();
  const pf=k=>{const ks=Object.keys(FX).filter(m=>m<mes&&k in FX[m]).sort();return ks.length?+FX[ks.pop()][k]||0:0};
